@@ -1,0 +1,116 @@
+plugins {
+    // spring boot plugin
+    id 'org.springframework.boot' version '2.5.8'
+    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+
+    // language configuration
+    id 'java'
+
+    // test coverage
+    id 'jacoco'
+
+    // ide configuration
+    id 'eclipse'
+    id 'idea'
+
+    // code generation
+    id 'org.unbroken-dome.test-sets' version '4.0.0'
+}
+
+// disable ...plain.jar
+jar {
+    enabled = false
+}
+
+// release configuration
+group 'com.intershop.iste.artifact'
+description 'Service to handle which versions per artifact of a test plan are allowed to run in the ISTE Environment'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+// set correct project status
+if (project.version.endsWith('-SNAPSHOT')) {
+    status = 'snapshot'
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    jUnit5Version = '5.8.2'
+    jacksonVersion = '2.9.4'
+    logstashLogbackEncoderVersion = '6.4'
+
+    springCloudVersion = '2020.0.5'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java', 'buildSrc/src/main/java']
+        }
+    }
+}
+
+dependencies {
+
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-actuator'
+    implementation group: 'org.springframework.boot', name: 'spring-boot-devtools'
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-hateoas'
+
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jacksonVersion}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-joda', version: "${jacksonVersion}"
+
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-jaxb-annotations', version: "${jacksonVersion}"
+
+    annotationProcessor("org.projectlombok:lombok")
+    compileOnly("org.projectlombok:lombok")
+
+    implementation group: 'net.logstash.logback', name: 'logstash-logback-encoder', version: "${logstashLogbackEncoderVersion}"
+
+    // testing
+    testImplementation(platform("org.junit:junit-bom:${jUnit5Version}"))
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher") {
+      because("Only needed to run tests in a version of IntelliJ IDEA that bundles older versions")
+    }
+    testImplementation("org.springframework.boot:spring-boot-starter-test") {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+}
+
+
+configurations {
+    integrationTestCompile.extendsFrom testCompile
+    integrationTestRuntime.extendsFrom testRuntime
+}
+
+testSets {
+    integrationTest { dirName = 'integration-test' }
+}
+
+tasks.withType(Test){
+    useJUnitPlatform()   // use JUnit 5
+}
+
+apply from: 'gradle/jacoco.gradle'
+
+check.dependsOn integrationTest
+check.finalizedBy jacocoTestReport
+integrationTest.mustRunAfter test
+
+bootRun {
+    jvmArgs = ["-Dspring.cloud.bootstrap.enabled=false", "-Dserver.port=2020"]
+}
+
+gradle.buildFinished {
+    Date now = new Date()
+    println "\n ***** All completed @ $now  ***"
+}
